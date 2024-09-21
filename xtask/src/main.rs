@@ -1,13 +1,14 @@
 //! Helper crate for building and testing `boot-manipulator`.
 
 use std::{
+    ffi::OsString,
     fmt::{self, Display},
     io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitCode,
 };
 
-use cli::{get_action, Action, BuildArguments, Feature};
+use cli::{get_action, Action, Arch, BuildArguments, Feature, RunArguments};
 
 pub mod cli;
 
@@ -15,6 +16,16 @@ fn main() -> ExitCode {
     match get_action() {
         Action::Build(arguments) => match build_boot_manipulator(arguments) {
             Ok(path) => println!("boot-manipulator located at \"{}\"", path.display()),
+            Err(error) => {
+                eprintln!("{error}");
+                return ExitCode::FAILURE;
+            }
+        },
+        Action::Run {
+            build_arguments,
+            run_arguments,
+        } => match run(build_arguments, run_arguments) {
+            Ok(()) => {}
             Err(error) => {
                 eprintln!("{error}");
                 return ExitCode::FAILURE;
@@ -74,6 +85,156 @@ impl Display for BuildError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "error while building boot-manipulator: {}", self.0)
     }
+}
+
+fn run(build_arguments: BuildArguments, run_arguments: RunArguments) -> Result<(), RunError> {
+    let arch = build_arguments.arch;
+
+    let boot_manipulator = build_boot_manipulator(build_arguments)?;
+    let fat_directory = build_fat_directory(arch, boot_manipulator, &[], &[])
+        .map_err(RunError::BuildFatDirectoryError)?;
+
+    run_qemu(arch, &fat_directory, run_arguments)?;
+
+    Ok(())
+}
+
+#[derive(Debug)]
+enum RunError {
+    /// An error occurred while building `boot_manipulator`.
+    BuildFailed(BuildError),
+    /// An error occurred while building the FAT directory.
+    BuildFatDirectoryError(std::io::Error),
+    /// An error occurred while running QEMU.
+    QemuError(QemuError),
+}
+
+impl From<BuildError> for RunError {
+    fn from(value: BuildError) -> Self {
+        Self::BuildFailed(value)
+    }
+}
+
+impl From<QemuError> for RunError {
+    fn from(value: QemuError) -> Self {
+        Self::QemuError(value)
+    }
+}
+
+impl Display for RunError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BuildFailed(error) => error.fmt(f),
+            Self::BuildFatDirectoryError(error) => {
+                write!(f, "error while building FAT directory: {error}")
+            }
+            Self::QemuError(error) => error.fmt(f),
+        }
+    }
+}
+
+fn run_qemu(
+    arch: Arch,
+    fat_directory: &Path,
+    run_arguments: RunArguments,
+) -> Result<(), QemuError> {
+    let name = match arch {
+        Arch::X86_64 => "qemu-system-x86_64",
+    };
+
+    let mut cmd = std::process::Command::new(name);
+
+    // Disable unnecessary devices
+    cmd.arg("-nodefaults");
+
+    cmd.args(["-boot", "menu=on,splash-time=0"]);
+    match arch {
+        Arch::X86_64 => {
+            // Target fairly modern cpu and machine
+            cmd.args(["-machine", "q35"]);
+            cmd.args(["-cpu", "max"]);
+
+            // Allocate a little memory.
+            cmd.args(["-m", "512M"]);
+
+            // Use VGA graphics as the windowing interface.
+            cmd.args(["-vga", "std"]);
+
+            if std::env::consts::OS == "linux" {
+                cmd.arg("-enable-kvm");
+            }
+        }
+    }
+
+    // Use OVMF code file.
+    let mut ovmf_code_arg = OsString::from("if=pflash,format=raw,readonly=on,file=");
+    ovmf_code_arg.push(run_arguments.ovmf_code);
+    cmd.arg("-drive").arg(ovmf_code_arg);
+
+    // Use OVMF vars file.
+    let mut ovmf_vars_arg = OsString::from("if=pflash,format=raw,readonly=on,file=");
+    ovmf_vars_arg.push(run_arguments.ovmf_vars);
+    cmd.arg("-drive").arg(ovmf_vars_arg);
+
+    // Use the given `fat_directory`.
+    let mut fat_drive_arg = OsString::from("format=raw,file=fat:rw:");
+    fat_drive_arg.push(fat_directory);
+    cmd.arg("-drive").arg(fat_drive_arg);
+
+    run_cmd(cmd)?;
+
+    Ok(())
+}
+
+/// Various errors that can occur while running QEMU.
+#[derive(Debug)]
+pub struct QemuError(RunCommandError);
+
+impl From<RunCommandError> for QemuError {
+    fn from(value: RunCommandError) -> Self {
+        Self(value)
+    }
+}
+
+impl fmt::Display for QemuError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "error while running QEMU: {}", self.0)
+    }
+}
+
+/// Sets up the FAT directory used for UEFI.
+pub fn build_fat_directory(
+    arch: Arch,
+    executable_path: PathBuf,
+    additional_files: &[(&Path, &str)],
+    additional_binary_files: &[(&[u8], &str)],
+) -> Result<PathBuf, std::io::Error> {
+    let mut fat_directory = PathBuf::with_capacity(50);
+    fat_directory.push("run");
+    fat_directory.push(arch.as_str());
+    fat_directory.push("fat_directory");
+
+    let mut boot_directory = fat_directory.join("EFI");
+    boot_directory.push("BOOT");
+    if !boot_directory.exists() {
+        std::fs::create_dir_all(&boot_directory)?;
+    }
+
+    let boot_file_name = match arch {
+        Arch::X86_64 => "BOOTX64.EFI",
+    };
+
+    std::fs::copy(executable_path, boot_directory.join(boot_file_name))?;
+
+    for &(file, name) in additional_files {
+        std::fs::copy(file, fat_directory.join(name))?;
+    }
+
+    for &(bytes, name) in additional_binary_files {
+        std::fs::write(fat_directory.join(name), bytes)?;
+    }
+
+    Ok(fat_directory)
 }
 
 /// Runs a [`Command`][c], handling non-zero exit codes and other failures.
