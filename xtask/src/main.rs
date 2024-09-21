@@ -181,7 +181,37 @@ fn run_qemu(
     fat_drive_arg.push(fat_directory);
     cmd.arg("-drive").arg(fat_drive_arg);
 
+    let mut outputs_path = PathBuf::with_capacity(50);
+    outputs_path.push("run");
+    outputs_path.push(arch.as_str());
+    outputs_path.push("outputs");
+
+    #[cfg(unix)]
+    {
+        let mode = nix::sys::stat::Mode::from_bits(0o666).unwrap();
+
+        match nix::unistd::mkfifo(&outputs_path.join("serial.in"), mode) {
+            Ok(()) => {},
+            Err(error) if error == nix::errno::Errno::EEXIST => {},
+            Err(error) => todo!("{error}"),
+        }
+
+        match nix::unistd::mkfifo(&outputs_path.join("serial.out"), mode) {
+            Ok(()) => {},
+            Err(error) if error == nix::errno::Errno::EEXIST => {},
+            Err(error) => todo!("{error}"),
+        }
+
+        cmd.args(["-serial", "pipe:run/x86_64/outputs/serial"]);
+    }
+
     run_cmd(cmd)?;
+
+    #[cfg(unix)]
+    {
+        std::fs::remove_file(&outputs_path.join("serial.in")).unwrap();
+        std::fs::remove_file(&outputs_path.join("serial.out")).unwrap();
+    }
 
     Ok(())
 }
