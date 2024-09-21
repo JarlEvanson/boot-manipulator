@@ -12,6 +12,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/JarlEvanson/boot-manipulator"
 
 [workspace.dependencies]
+clap = "4.5.18"
 
 [workspace.lints.rust]
 # Safety lints
