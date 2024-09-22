@@ -4,7 +4,7 @@
 #![no_main]
 
 use core::{
-    fmt::Write,
+    fmt::{self, Write},
     ptr,
 };
 
@@ -13,6 +13,7 @@ use uefi::{boot, proto::console::serial::Serial};
 
 mod arch;
 pub mod console;
+mod logging;
 mod spinlock;
 
 static EXIT_SERVICES: spinlock::Spinlock<
@@ -21,6 +22,8 @@ static EXIT_SERVICES: spinlock::Spinlock<
 
 #[uefi::entry]
 fn entry_point() -> uefi::Status {
+    logging::initialize_logging(log::LevelFilter::Trace);
+
     match setup() {
         uefi::Status::SUCCESS => {}
         status_code => {
@@ -96,8 +99,8 @@ unsafe extern "efiapi" fn exit_boot_services(
         panic!("Virtualization not supported");
     }
 
-    virtualization::enable_support(&mut Debugcon);
-    let _ = writeln!(Debugcon, "Virtualization succeeded");
+    virtualization::enable_support();
+    log::info!("VMX successfully entered");
 
     loop {}
 }
@@ -109,11 +112,7 @@ unsafe extern "efiapi" fn placeholder(_: *mut core::ffi::c_void, _: usize) -> ue
 #[cfg_attr(not(test), panic_handler)]
 #[allow(unused)]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-    if uefi::table::system_table_boot().is_some() {
-        uefi::system::with_stdout(|stdout| writeln!(stdout, "{info}"));
-    }
-
-    writeln!(Debugcon, "{info}");
+    log::error!("{info}");
 
     loop {}
 }

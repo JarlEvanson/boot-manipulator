@@ -1,6 +1,10 @@
 //! Definitions of `x86_64` virtualization mechanisms.
 
-use core::{arch::asm, fmt::Write, ptr, sync::atomic::{AtomicPtr, Ordering}};
+use core::{
+    arch::asm,
+    ptr,
+    sync::atomic::{AtomicPtr, Ordering},
+};
 
 use uefi::boot;
 
@@ -39,13 +43,13 @@ pub fn allocate_basic_memory() {
     VMXON_REGION.store(vmxon_ptr.as_ptr(), Ordering::Relaxed);
 }
 
-pub fn enable_support(writer: &mut dyn Write) {
+pub fn enable_support() {
     assert!(is_supported());
 
     let feature_control = readmsr(FEATURE_CONTROL_MSR);
     let required_bits = FEATURE_CONTROL_MSR_LOCKED | FEATURE_CONTROL_MSR_VMX_OUTSIDE_SMX;
-    let _ = writeln!(writer, "VMX Feature Control: {feature_control:016X}");
-    let _ = writeln!(writer, "VMX Feature Control Required: {required_bits:016X}");
+    log::trace!("VMX Feature Control: {feature_control:016X}");
+    log::trace!("VMX Feature Control Required: {required_bits:016X}");
 
     assert!(
         (feature_control & FEATURE_CONTROL_MSR_LOCKED) != FEATURE_CONTROL_MSR_LOCKED
@@ -54,7 +58,7 @@ pub fn enable_support(writer: &mut dyn Write) {
 
     if (feature_control & required_bits) != required_bits {
         writemsr(FEATURE_CONTROL_MSR, feature_control | required_bits);
-        let _ = writeln!(writer, "Enabled feature control bits");
+        log::trace!("Enabled feature control bits");
     }
 
     unsafe {
@@ -66,18 +70,16 @@ pub fn enable_support(writer: &mut dyn Write) {
             options(nomem, nostack)
         );
     }
-    let _ = writeln!(writer, "Enabled CR4 VMX bit");
+    log::trace!("Enabled CR4 VMX bit");
 
-    let _ = writeln!(
-        writer,
+    log::trace!(
         "CR0 VMX Fixed 0: {}\nCR0 VMX Fixed 1: {}\nCR0: {}",
         Cr0Display(readmsr(VMX_CR0_FIXED0)),
         Cr0Display(!readmsr(VMX_CR0_FIXED1)),
         Cr0::get()
     );
 
-    let _ = writeln!(
-        writer,
+    log::trace!(
         "CR4 VMX Fixed 0: {}\nCR4 VMX Fixed 1: {}\nCR4: {}",
         Cr4Display(readmsr(VMX_CR4_FIXED0)),
         Cr4Display(!readmsr(VMX_CR4_FIXED1)),
@@ -85,11 +87,11 @@ pub fn enable_support(writer: &mut dyn Write) {
     );
 
     let vmx_revision = readmsr(VMX_REVISION) as u32;
-    let _ = writeln!(writer, "VMX basic: {:016X}", readmsr(VMX_REVISION));
+    log::trace!("VMX basic: {:016X}", readmsr(VMX_REVISION));
 
     let vmxon_ptr = VMXON_REGION.load(Ordering::Relaxed);
     assert!(!vmxon_ptr.is_null());
-    let _ = writeln!(writer, "VMXON ptr: {vmxon_ptr:p}");
+    log::trace!("VMXON ptr: {vmxon_ptr:p}");
     unsafe { core::ptr::write_bytes::<u8>(vmxon_ptr, 0, 4096) }
     unsafe { vmxon_ptr.cast::<u32>().write(vmx_revision) }
 

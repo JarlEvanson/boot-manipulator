@@ -9,7 +9,8 @@ repository.workspace = true
 [features]
 
 [dependencies]
-uefi = "*"
+uefi = "0.32.0"
+log = "0.4.22"
 
 [lints]
 workspace = true
