@@ -3,10 +3,15 @@
 #![no_std]
 #![no_main]
 
-use core::{fmt::Write, ptr};
+use core::{
+    fmt::Write,
+    ptr,
+};
 
+use arch::virtualization;
 use uefi::{boot, proto::console::serial::Serial};
 
+mod arch;
 pub mod console;
 mod spinlock;
 
@@ -34,6 +39,10 @@ fn entry_point() -> uefi::Status {
 
     *EXIT_SERVICES.lock() = unsafe { *exit_boot_services_func_ptr };
     unsafe { *exit_boot_services_func_ptr = exit_boot_services };
+
+    virtualization::allocate_basic_memory();
+
+    let _ = unsafe { boot::exit_boot_services(boot::MemoryType::LOADER_DATA) };
 
     loop {}
 }
@@ -63,6 +72,18 @@ fn setup() -> uefi::Status {
     uefi::Status::SUCCESS
 }
 
+struct Debugcon;
+
+impl Write for Debugcon {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        for byte in s.bytes() {
+            unsafe { core::arch::asm!("out dx, al", in("dx") 0xe9, in("al") byte) }
+        }
+
+        Ok(())
+    }
+}
+
 unsafe extern "efiapi" fn exit_boot_services(
     image_handle: *mut core::ffi::c_void,
     map_key: usize,
@@ -71,10 +92,18 @@ unsafe extern "efiapi" fn exit_boot_services(
 
     let result = unsafe { (func)(image_handle, map_key) };
     if result != uefi::Status::SUCCESS {
+        let _ = writeln!(Debugcon, "Exit failed: {result}");
         return result;
     }
 
-    todo!()
+    if !virtualization::is_supported() {
+        panic!("Virtualization not supported");
+    }
+
+    virtualization::enable_support(&mut Debugcon);
+    let _ = writeln!(Debugcon, "Virtualization succeeded");
+
+    loop {}
 }
 
 unsafe extern "efiapi" fn placeholder(_: *mut core::ffi::c_void, _: usize) -> uefi::Status {
@@ -87,6 +116,8 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     if uefi::table::system_table_boot().is_some() {
         uefi::system::with_stdout(|stdout| writeln!(stdout, "{info}"));
     }
+
+    writeln!(Debugcon, "{info}");
 
     loop {}
 }
