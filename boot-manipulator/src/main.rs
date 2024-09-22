@@ -83,6 +83,7 @@ unsafe extern "efiapi" fn exit_boot_services(
     if result != uefi::Status::SUCCESS {
         return result;
     }
+    logging::transition_boot_services();
 
     if !virtualization::is_supported() {
         panic!("Virtualization not supported");
