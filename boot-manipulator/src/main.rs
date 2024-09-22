@@ -5,7 +5,7 @@
 
 use core::{fmt, ptr};
 
-use arch::virtualization;
+use arch::{exit_boot_services_handler, virtualization};
 
 mod arch;
 pub mod console;
@@ -70,24 +70,14 @@ fn setup_boot_services_interception() {
     let exit_boot_services_func = unsafe { &mut ((*boot_services_table_ptr).exit_boot_services) };
 
     unsafe { EXIT_BOOT_SERVICES_PTR = *exit_boot_services_func };
-    *exit_boot_services_func = exit_boot_services;
+    *exit_boot_services_func = exit_boot_services_handler;
 }
 
-unsafe extern "efiapi" fn exit_boot_services(
-    image_handle: *mut core::ffi::c_void,
-    map_key: usize,
-) -> uefi::Status {
-    let func = unsafe { EXIT_BOOT_SERVICES_PTR };
-
-    let result = unsafe { (func)(image_handle, map_key) };
-    if result != uefi::Status::SUCCESS {
-        return result;
-    }
+/// # Safety
+/// - This function must not be called if virtualization is not supported.
+/// - This function must only be called once, and only after boot services have exited.
+unsafe extern "C" fn setup_virtualization() -> ! {
     logging::transition_boot_services();
-
-    if !virtualization::is_supported() {
-        panic!("Virtualization not supported");
-    }
 
     virtualization::enable_support();
     log::info!("VMX successfully entered");
