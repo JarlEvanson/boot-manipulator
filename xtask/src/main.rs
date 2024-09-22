@@ -191,14 +191,14 @@ fn run_qemu(
         let mode = nix::sys::stat::Mode::from_bits(0o666).unwrap();
 
         match nix::unistd::mkfifo(&outputs_path.join("serial.in"), mode) {
-            Ok(()) => {},
-            Err(error) if error == nix::errno::Errno::EEXIST => {},
+            Ok(()) => {}
+            Err(error) if error == nix::errno::Errno::EEXIST => {}
             Err(error) => todo!("{error}"),
         }
 
         match nix::unistd::mkfifo(&outputs_path.join("serial.out"), mode) {
-            Ok(()) => {},
-            Err(error) if error == nix::errno::Errno::EEXIST => {},
+            Ok(()) => {}
+            Err(error) if error == nix::errno::Errno::EEXIST => {}
             Err(error) => todo!("{error}"),
         }
 
