@@ -3,10 +3,16 @@
 #![no_std]
 #![no_main]
 
+use core::{fmt::Write, ptr};
+
 use uefi::{boot, proto::console::serial::Serial};
 
 pub mod console;
 mod spinlock;
+
+static EXIT_SERVICES: spinlock::Spinlock<
+    unsafe extern "efiapi" fn(*mut core::ffi::c_void, usize) -> uefi::Status,
+> = spinlock::Spinlock::new(placeholder);
 
 #[uefi::entry]
 fn entry_point() -> uefi::Status {
@@ -17,6 +23,17 @@ fn entry_point() -> uefi::Status {
             return status_code;
         }
     }
+
+    let system_table_ptr = uefi::table::system_table_raw()
+        .map(|ptr| ptr.as_ptr())
+        .unwrap_or(ptr::null_mut());
+
+    let boot_services_table_ptr = unsafe { (*system_table_ptr).boot_services };
+    let exit_boot_services_func_ptr =
+        unsafe { ptr::addr_of_mut!((*boot_services_table_ptr).exit_boot_services) };
+
+    *EXIT_SERVICES.lock() = unsafe { *exit_boot_services_func_ptr };
+    unsafe { *exit_boot_services_func_ptr = exit_boot_services };
 
     loop {}
 }
@@ -41,7 +58,27 @@ fn setup() -> uefi::Status {
         }
     };
 
+    let _ = serial.write_str("Testing");
+
     uefi::Status::SUCCESS
+}
+
+unsafe extern "efiapi" fn exit_boot_services(
+    image_handle: *mut core::ffi::c_void,
+    map_key: usize,
+) -> uefi::Status {
+    let func = *EXIT_SERVICES.lock();
+
+    let result = unsafe { (func)(image_handle, map_key) };
+    if result != uefi::Status::SUCCESS {
+        return result;
+    }
+
+    todo!()
+}
+
+unsafe extern "efiapi" fn placeholder(_: *mut core::ffi::c_void, _: usize) -> uefi::Status {
+    panic!("exit_boot_services placeholder reached")
 }
 
 #[cfg_attr(not(test), panic_handler)]
