@@ -42,9 +42,7 @@ fn entry_point() -> uefi::Status {
 
     virtualization::allocate_basic_memory();
 
-    let _ = unsafe { boot::exit_boot_services(boot::MemoryType::LOADER_DATA) };
-
-    loop {}
+    uefi::Status::SUCCESS
 }
 
 fn setup() -> uefi::Status {
@@ -66,8 +64,6 @@ fn setup() -> uefi::Status {
             return uefi::Status::LOAD_ERROR;
         }
     };
-
-    let _ = serial.write_str("Testing");
 
     uefi::Status::SUCCESS
 }
