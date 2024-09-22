@@ -36,20 +36,27 @@ fn entry_point() -> uefi::Status {
 }
 
 fn setup() -> Result<(), DriverSetupError> {
-    setup_boot_services_interception();
+    if !virtualization::is_supported() {
+        return Err(DriverSetupError::VirtualizationUnsupported);
+    }
 
     virtualization::allocate_basic_memory();
+
+    setup_boot_services_interception();
 
     Ok(())
 }
 
 /// Various errors that can occur while setting up the driver.
-pub enum DriverSetupError {}
+pub enum DriverSetupError {
+    /// Virtualization is not supported on this processor.
+    VirtualizationUnsupported,
+}
 
 impl fmt::Display for DriverSetupError {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            _ => Ok(()),
+            Self::VirtualizationUnsupported => write!(f, "virtualization is not supported"),
         }
     }
 }
