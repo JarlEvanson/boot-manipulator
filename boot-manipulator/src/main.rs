@@ -6,6 +6,7 @@
 use uefi::{boot, proto::console::serial::Serial};
 
 pub mod console;
+mod spinlock;
 
 #[uefi::entry]
 fn entry_point() -> uefi::Status {
