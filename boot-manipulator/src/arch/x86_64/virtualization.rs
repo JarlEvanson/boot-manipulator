@@ -80,19 +80,21 @@ pub fn enable_support() {
     }
     log::trace!("Enabled CR4 VMX bit");
 
-    log::trace!(
-        "CR0 VMX Fixed 0: {}\nCR0 VMX Fixed 1: {}\nCR0: {}",
-        unsafe { Cr0Display(read_msr(VMX_CR0_FIXED0)) },
-        unsafe { Cr0Display(!read_msr(VMX_CR0_FIXED1)) },
-        Cr0::get()
-    );
+    log::trace!("CR0 VMX Fixed 0: {}", unsafe {
+        Cr0Display(read_msr(VMX_CR0_FIXED0))
+    });
+    log::trace!("CR0 VMX Fixed 1: {}", unsafe {
+        Cr0Display(!read_msr(VMX_CR0_FIXED1))
+    });
+    log::trace!("CR0: {}", Cr0::get());
 
-    log::trace!(
-        "CR4 VMX Fixed 0: {}\nCR4 VMX Fixed 1: {}\nCR4: {}",
-        unsafe { Cr4Display(read_msr(VMX_CR4_FIXED0)) },
-        unsafe { Cr4Display(!read_msr(VMX_CR4_FIXED1)) },
-        Cr4::get(),
-    );
+    log::trace!("CR4 VMX Fixed 0: {}", unsafe {
+        Cr4Display(read_msr(VMX_CR4_FIXED0))
+    });
+    log::trace!("CR4 VMX Fixed 1: {}", unsafe {
+        Cr4Display(!read_msr(VMX_CR4_FIXED1))
+    });
+    log::trace!("CR4: {}", Cr4::get());
 
     let vmx_basic = unsafe { read_msr(VMX_REVISION) };
     let vmx_revision = vmx_basic as u32;
