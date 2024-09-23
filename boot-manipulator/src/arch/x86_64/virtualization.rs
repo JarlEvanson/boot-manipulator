@@ -95,19 +95,16 @@ pub fn enable_support() {
     unsafe { core::ptr::write_bytes::<u8>(vmxon_ptr, 0, 4096) }
     unsafe { vmxon_ptr.cast::<u32>().write(vmx_revision) }
 
-    let successful: u16;
+    let success: u8;
     unsafe {
         asm!(
-            "xor dx, dx",
-            "mov cx, 1",
-            "vmxon [rax]",
-            "cmovnc dx, cx",
-            in("rax") &vmxon_ptr,
-            out("cx") _,
-            out("dx") successful,
+            "vmxon [{}]",
+            "seta {}",
+            in(reg) &vmxon_ptr,
+            lateout(reg_byte) success,
         )
     }
-    assert!(successful != 0);
+    assert_eq!(success, 1);
 }
 
 fn readmsr(msr: u32) -> u64 {
