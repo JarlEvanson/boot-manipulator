@@ -106,6 +106,38 @@ impl fmt::Display for Cr0Display {
 }
 
 #[derive(Clone, Copy, Default, Hash, PartialEq, Eq)]
+pub struct Cr2(u64);
+
+impl Cr2 {
+    pub fn get() -> Cr2 {
+        let cr2: u64;
+        unsafe {
+            core::arch::asm!(
+                "mov {}, cr2",
+                out(reg) cr2
+            )
+        }
+        Self(cr2)
+    }
+}
+
+#[derive(Clone, Copy, Default, Hash, PartialEq, Eq)]
+pub struct Cr3(u64);
+
+impl Cr3 {
+    pub fn get() -> Cr3 {
+        let cr3: u64;
+        unsafe {
+            core::arch::asm!(
+                "mov {}, cr3",
+                out(reg) cr3
+            )
+        }
+        Self(cr3)
+    }
+}
+
+#[derive(Clone, Copy, Default, Hash, PartialEq, Eq)]
 pub struct Cr4(u64);
 
 impl Cr4 {

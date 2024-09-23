@@ -8,7 +8,7 @@ use core::{
 
 use uefi::boot;
 
-use crate::arch::x86_64::control_regs::{Cr0, Cr0Display, Cr4, Cr4Display};
+use crate::arch::x86_64::registers::control::{Cr0, Cr0Display, Cr4, Cr4Display};
 
 const CR4_VMXE_BIT: u8 = 5;
 const CR4_VMXE: u64 = 1 << CR4_VMXE_BIT;
