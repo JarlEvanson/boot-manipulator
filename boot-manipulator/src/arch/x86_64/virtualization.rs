@@ -8,22 +8,19 @@ use core::{
 
 use uefi::boot;
 
-use crate::arch::x86_64::registers::control::{Cr0, Cr0Display, Cr4, Cr4Display};
+use crate::arch::x86_64::registers::{
+    control::{Cr0, Cr0Display, Cr4, Cr4Display},
+    msr::{
+        read_msr, write_msr, FEATURE_CONTROL, VMX_CR0_FIXED0, VMX_CR0_FIXED1, VMX_CR4_FIXED0,
+        VMX_CR4_FIXED1, VMX_REVISION,
+    },
+};
 
 const CR4_VMXE_BIT: u8 = 5;
 const CR4_VMXE: u64 = 1 << CR4_VMXE_BIT;
 
-const FEATURE_CONTROL_MSR: u32 = 0x3a;
 const FEATURE_CONTROL_MSR_LOCKED: u64 = 1;
 const FEATURE_CONTROL_MSR_VMX_OUTSIDE_SMX: u64 = 1 << 2;
-
-const VMX_CR0_FIXED0: u32 = 0x486;
-const VMX_CR0_FIXED1: u32 = 0x487;
-
-const VMX_CR4_FIXED0: u32 = 0x488;
-const VMX_CR4_FIXED1: u32 = 0x489;
-
-const VMX_REVISION: u32 = 0x480;
 
 static VMXON_REGION: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
 static VMCS_REGION: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
@@ -56,7 +53,7 @@ pub fn allocate_basic_memory() {
 pub fn enable_support() {
     assert!(is_supported());
 
-    let feature_control = readmsr(FEATURE_CONTROL_MSR);
+    let feature_control = unsafe { read_msr(FEATURE_CONTROL) };
     let required_bits = FEATURE_CONTROL_MSR_LOCKED | FEATURE_CONTROL_MSR_VMX_OUTSIDE_SMX;
     log::trace!("VMX Feature Control: {feature_control:016X}");
     log::trace!("VMX Feature Control Required: {required_bits:016X}");
@@ -67,7 +64,7 @@ pub fn enable_support() {
     );
 
     if (feature_control & required_bits) != required_bits {
-        writemsr(FEATURE_CONTROL_MSR, feature_control | required_bits);
+        unsafe { write_msr(FEATURE_CONTROL, feature_control | required_bits) }
         log::trace!("Enabled feature control bits");
     }
 
@@ -84,20 +81,21 @@ pub fn enable_support() {
 
     log::trace!(
         "CR0 VMX Fixed 0: {}\nCR0 VMX Fixed 1: {}\nCR0: {}",
-        Cr0Display(readmsr(VMX_CR0_FIXED0)),
-        Cr0Display(!readmsr(VMX_CR0_FIXED1)),
+        unsafe { Cr0Display(read_msr(VMX_CR0_FIXED0)) },
+        unsafe { Cr0Display(!read_msr(VMX_CR0_FIXED1)) },
         Cr0::get()
     );
 
     log::trace!(
         "CR4 VMX Fixed 0: {}\nCR4 VMX Fixed 1: {}\nCR4: {}",
-        Cr4Display(readmsr(VMX_CR4_FIXED0)),
-        Cr4Display(!readmsr(VMX_CR4_FIXED1)),
+        unsafe { Cr4Display(read_msr(VMX_CR4_FIXED0)) },
+        unsafe { Cr4Display(!read_msr(VMX_CR4_FIXED1)) },
         Cr4::get(),
     );
 
-    let vmx_revision = readmsr(VMX_REVISION) as u32;
-    log::trace!("VMX basic: {:016X}", readmsr(VMX_REVISION));
+    let vmx_basic = unsafe { read_msr(VMX_REVISION) };
+    let vmx_revision = vmx_basic as u32;
+    log::trace!("VMX basic: {:016X}", vmx_basic);
 
     let vmxon_ptr = VMXON_REGION.load(Ordering::Relaxed);
     assert!(!vmxon_ptr.is_null());
@@ -121,7 +119,7 @@ pub fn setup_virtual_machine_state() {
     let vmcs_ptr = VMCS_REGION.load(Ordering::Relaxed);
 
     unsafe { core::ptr::write_bytes::<u8>(vmcs_ptr, 0, 4096) }
-    unsafe { vmcs_ptr.cast::<u32>().write(readmsr(VMX_REVISION) as u32) }
+    unsafe { vmcs_ptr.cast::<u32>().write(read_msr(VMX_REVISION) as u32) }
     log::trace!("VMCS ptr: {vmcs_ptr:p}");
 
     let valid_vmcs_ptr: u8;
@@ -139,18 +137,4 @@ pub fn setup_virtual_machine_state() {
 
     assert!(valid_vmcs_ptr == 1);
     assert!(other_error == 1);
-}
-
-fn readmsr(msr: u32) -> u64 {
-    let rax: u64;
-    let rdx: u64;
-    unsafe { asm!("rdmsr", in("ecx") msr, lateout("eax") rax, lateout("edx") rdx) }
-
-    (rax as u64) | ((rdx as u64) << 32)
-}
-
-fn writemsr(msr: u32, value: u64) {
-    unsafe {
-        asm!("wrmsr", in("ecx") msr, in("eax") value as u32, in("edx") ((value >> 32) as u32))
-    }
 }
