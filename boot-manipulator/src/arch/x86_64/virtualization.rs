@@ -14,6 +14,7 @@ use crate::arch::x86_64::registers::{
         read_msr, write_msr, FEATURE_CONTROL, VMX_CR0_FIXED0, VMX_CR0_FIXED1, VMX_CR4_FIXED0,
         VMX_CR4_FIXED1, VMX_REVISION,
     },
+    Gdtr, Idtr,
 };
 
 const CR4_VMXE_BIT: u8 = 5;
@@ -137,4 +138,43 @@ pub fn setup_virtual_machine_state() {
 
     assert!(valid_vmcs_ptr == 1);
     assert!(other_error == 1);
+
+    setup_guest_state();
+}
+
+fn setup_guest_state() {
+    let machine_state = unsafe { crate::arch::REGISTERS.assume_init_ref() };
+    let idtr = Idtr::get();
+    let gdtr = Gdtr::get();
+
+    assert!(vm_write(0x00000800, machine_state.es as u64));
+    assert!(vm_write(0x00000802, machine_state.cs as u64));
+    assert!(vm_write(0x00000804, machine_state.ss as u64));
+    assert!(vm_write(0x00000806, machine_state.ds as u64));
+    assert!(vm_write(0x00000808, machine_state.fs as u64));
+    assert!(vm_write(0x0000080A, machine_state.gs as u64));
+
+    // GDT configuration
+    assert!(vm_write(0x00004810, gdtr.limit() as u64));
+    assert!(vm_write(0x00006816, gdtr.address()));
+
+    // IDT configuration
+    assert!(vm_write(0x00004812, idtr.limit() as u64));
+    assert!(vm_write(0x00006818, idtr.address()));
+}
+
+pub fn vm_write(encoding: u32, value: u64) -> bool {
+    let other_error: u8;
+
+    unsafe {
+        asm!(
+            "vmwrite {}, {}",
+            "setnz {}",
+            in(reg) encoding as u64,
+            in(reg) value,
+            lateout(reg_byte) other_error
+        )
+    }
+
+    other_error == 1
 }
