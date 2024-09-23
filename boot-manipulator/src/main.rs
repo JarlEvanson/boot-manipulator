@@ -82,6 +82,9 @@ unsafe extern "C" fn setup_virtualization() -> ! {
     virtualization::enable_support();
     log::info!("VMX successfully entered");
 
+    virtualization::setup_virtual_machine_state();
+    log::info!("Virtual Machine state initialized");
+
     loop {}
 }
 

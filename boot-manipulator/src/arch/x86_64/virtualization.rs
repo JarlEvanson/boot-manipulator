@@ -26,6 +26,7 @@ const VMX_CR4_FIXED1: u32 = 0x489;
 const VMX_REVISION: u32 = 0x480;
 
 static VMXON_REGION: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+static VMCS_REGION: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
 
 pub fn is_supported() -> bool {
     let ecx = unsafe { core::arch::x86_64::__cpuid(1).ecx };
@@ -41,6 +42,15 @@ pub fn allocate_basic_memory() {
     .unwrap();
 
     VMXON_REGION.store(vmxon_ptr.as_ptr(), Ordering::Relaxed);
+
+    let vmcs_ptr = boot::allocate_pages(
+        boot::AllocateType::AnyPages,
+        boot::MemoryType::LOADER_DATA,
+        1,
+    )
+    .unwrap();
+
+    VMCS_REGION.store(vmcs_ptr.as_ptr(), Ordering::Relaxed);
 }
 
 pub fn enable_support() {
@@ -105,6 +115,30 @@ pub fn enable_support() {
         )
     }
     assert_eq!(success, 1);
+}
+
+pub fn setup_virtual_machine_state() {
+    let vmcs_ptr = VMCS_REGION.load(Ordering::Relaxed);
+
+    unsafe { core::ptr::write_bytes::<u8>(vmcs_ptr, 0, 4096) }
+    unsafe { vmcs_ptr.cast::<u32>().write(readmsr(VMX_REVISION) as u32) }
+    log::trace!("VMCS ptr: {vmcs_ptr:p}");
+
+    let valid_vmcs_ptr: u8;
+    let other_error: u8;
+    unsafe {
+        asm!(
+            "vmptrld [{}]",
+            "setnc {}",
+            "setnz {}",
+            in(reg) &vmcs_ptr,
+            lateout(reg_byte) valid_vmcs_ptr,
+            lateout(reg_byte) other_error,
+        )
+    }
+
+    assert!(valid_vmcs_ptr == 1);
+    assert!(other_error == 1);
 }
 
 fn readmsr(msr: u32) -> u64 {
