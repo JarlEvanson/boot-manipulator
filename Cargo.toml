@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
-members = []
+members = [
+    "boot-manipulator",
+]
 
 [workspace.package]
 authors = [ "Jarl Evanson <evanson.jarl@gmail.com>" ]
