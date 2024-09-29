@@ -1,9 +1,18 @@
 //! Command line parsing and [`Action`] construction.
 
+use std::path::PathBuf;
+
 /// The action to carry out.
 pub enum Action {
     /// Builds `boot-manipulator` and `boot-manipulator-cli`.
     Build(BuildArguments),
+    /// Build and run `boot-manipulator`.
+    Run {
+        /// Arguments necessary to build `boot-manipulator` and `boot-manipulator-cli`.
+        build_arguments: BuildArguments,
+        /// Arguments necessary to run `boot-manipulator`.
+        run_arguments: RunArguments,
+    },
 }
 
 /// Arguments necessary to determine how to build `boot-manipulator`.
@@ -17,6 +26,15 @@ pub struct BuildArguments {
     pub features: Vec<Feature>,
 }
 
+/// Arguments necessary to determine how to run `boot-manipulator`.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct RunArguments {
+    /// The path to the OVMF code file used to run UEFI.
+    pub ovmf_code: PathBuf,
+    /// The path to the OVMF vars file used to run UEFI.
+    pub ovmf_vars: PathBuf,
+}
+
 /// Parses arguments to construct an [`Action`].
 pub fn get_action() -> Action {
     let mut matches = command_parser().get_matches();
@@ -24,6 +42,15 @@ pub fn get_action() -> Action {
         matches.remove_subcommand().expect("subcommand required");
     match subcommand_name.as_str() {
         "build" => Action::Build(parse_build_arguments(&mut subcommand_matches)),
+        "run" => {
+            let build_arguments = parse_build_arguments(&mut subcommand_matches);
+            let run_arguments = parse_run_arguments(&mut subcommand_matches);
+
+            Action::Run {
+                build_arguments,
+                run_arguments,
+            }
+        }
         name => unreachable!("unexpected subcommand {name:?}"),
     }
 }
@@ -42,6 +69,20 @@ fn parse_build_arguments(matches: &mut clap::ArgMatches) -> BuildArguments {
         arch,
         release,
         features,
+    }
+}
+
+fn parse_run_arguments(matches: &mut clap::ArgMatches) -> RunArguments {
+    let ovmf_code = matches
+        .remove_one("ovmf-code")
+        .expect("ovmf-code is required");
+    let ovmf_vars = matches
+        .remove_one("ovmf-vars")
+        .expect("ovmf-vars is required");
+
+    RunArguments {
+        ovmf_code,
+        ovmf_vars,
     }
 }
 
@@ -68,15 +109,36 @@ fn command_parser() -> clap::Command {
 
     let build_subcommand = clap::Command::new("build")
         .about("Builds boot-manipulator and boot-manipulator-cli")
-        .arg(arch_arg.help(
+        .arg(arch_arg.clone().help(
             "The architecture for which boot-manipulator and boot-manipulator-cli should be built",
         ))
+        .arg(release_arg.clone())
+        .arg(features_arg.clone());
+
+    let ovmf_code_arg = clap::Arg::new("ovmf-code")
+        .long("ovmf-code")
+        .short('c')
+        .value_parser(clap::builder::PathBufValueParser::new())
+        .required(true);
+
+    let ovmf_vars_arg = clap::Arg::new("ovmf-vars")
+        .long("ovmf-vars")
+        .short('v')
+        .value_parser(clap::builder::PathBufValueParser::new())
+        .required(true);
+
+    let run_subcommand = clap::Command::new("run")
+        .about("Runs boot-manipulator using QEMU")
+        .arg(arch_arg.help("The architecutre for which boot-manipulator should be built and run"))
         .arg(release_arg)
-        .arg(features_arg);
+        .arg(features_arg)
+        .arg(ovmf_code_arg)
+        .arg(ovmf_vars_arg);
 
     clap::Command::new("xtask")
         .about("Developer utility for running various tasks in boot-manipulator")
         .subcommand(build_subcommand)
+        .subcommand(run_subcommand)
         .subcommand_required(true)
         .arg_required_else_help(true)
 }
