@@ -128,6 +128,13 @@ pub fn target_triple(arch: Arch, platform: Platform) -> &'static str {
     }
 }
 
+/// Returns the suffix for the binary, if one exists for the pair of the [`Arch`] and [`Platform`].
+pub fn binary_suffix(arch: Arch, platform: Platform) -> Option<&'static str> {
+    match (arch, platform) {
+        (Arch::X86_64 | Arch::X86, Platform::Uefi) => Some("efi"),
+    }
+}
+
 /// The architectures supported by `boot-manipulator`.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Arch {
