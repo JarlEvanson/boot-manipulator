@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+log = "0.4.22"
 uefi = "0.32.0"
 
 [lints]
