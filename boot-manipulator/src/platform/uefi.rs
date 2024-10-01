@@ -21,6 +21,14 @@ fn entry() -> Status {
         }
     }
 
+    match crate::main() {
+        Ok(()) => {}
+        Err(error) => {
+            log::error!("{error}");
+            return Status::LOAD_ERROR;
+        }
+    }
+
     Status::SUCCESS
 }
 
