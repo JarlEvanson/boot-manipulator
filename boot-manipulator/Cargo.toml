@@ -12,5 +12,8 @@ log = "0.4.22"
 [target.'cfg(target_os = "uefi")'.dependencies]
 uefi = "0.32.0"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86 = { git = "https://github.com/JarlEvanson/x86.git", branch = "rewrite", default-features = false, features = ["x86_64", "instructions"] }
+
 [lints]
 workspace = true

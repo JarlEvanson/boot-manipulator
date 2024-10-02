@@ -18,7 +18,10 @@ pub trait ArchitectureOps {
 }
 
 /// Describes the basic set of virtualization APIs required for setting up `boot-manipulator`.
-pub trait VirtualizationOps {}
+pub trait VirtualizationOps {
+    /// Returns `true` if virtualization is supported on this processor; otherwise returns `false`.
+    fn is_supported() -> bool;
+}
 
 /// Dummy architecture to allow for easier development.
 pub struct DummyArch;
@@ -30,4 +33,8 @@ impl ArchitectureOps for DummyArch {
 /// Dummy virtualization implementation to allow for easier development.
 pub struct DummyVirtualization;
 
-impl VirtualizationOps for DummyVirtualization {}
+impl VirtualizationOps for DummyVirtualization {
+    fn is_supported() -> bool {
+        unimplemented!()
+    }
+}
