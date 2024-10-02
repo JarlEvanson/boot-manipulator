@@ -188,6 +188,7 @@ impl clap::ValueEnum for Feature {
 pub fn target_triple(arch: Arch, platform: Platform) -> &'static str {
     match (arch, platform) {
         (Arch::X86_64, Platform::Uefi) => "x86_64-unknown-uefi",
+        (Arch::X86, Platform::Uefi) => "i686-unknown-uefi",
     }
 }
 
@@ -195,12 +196,15 @@ pub fn target_triple(arch: Arch, platform: Platform) -> &'static str {
 pub fn binary_suffix(arch: Arch, platform: Platform) -> Option<&'static str> {
     match (arch, platform) {
         (Arch::X86_64, Platform::Uefi) => Some("efi"),
+        (Arch::X86, Platform::Uefi) => Some("efi"),
     }
 }
 
 /// The architectures supported by `boot-manipulator`.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Arch {
+    /// The `x86` architecture.
+    X86,
     /// The `x86_64` architecture.
     X86_64,
 }
@@ -209,6 +213,7 @@ impl Arch {
     /// Returns the [`Arch`] as its textual representation.
     pub fn as_str(&self) -> &'static str {
         match self {
+            Self::X86 => "x86",
             Self::X86_64 => "x86_64",
         }
     }
@@ -217,7 +222,7 @@ impl Arch {
 impl clap::ValueEnum for Arch {
     fn value_variants<'a>() -> &'a [Self] {
         /// A list of all of the supported architectures.
-        static ARCHES: &[Arch] = &[Arch::X86_64];
+        static ARCHES: &[Arch] = &[Arch::X86, Arch::X86_64];
 
         ARCHES
     }

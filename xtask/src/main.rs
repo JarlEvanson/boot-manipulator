@@ -155,6 +155,7 @@ fn run_qemu(
     run_arguments: RunArguments,
 ) -> Result<(), QemuError> {
     let name = match arch {
+        Arch::X86 => "qemu-system-i386",
         Arch::X86_64 => "qemu-system-x86_64",
     };
 
@@ -165,7 +166,7 @@ fn run_qemu(
 
     cmd.args(["-boot", "menu=on,splash-time=0"]);
     match arch {
-        Arch::X86_64 => {
+        Arch::X86 | Arch::X86_64 => {
             // Target a fairly modern cpu and machine
             cmd.args(["-cpu", "max"]);
             cmd.args(["-machine", "q35"]);
