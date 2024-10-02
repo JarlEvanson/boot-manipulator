@@ -6,6 +6,7 @@
 
 use core::{error, fmt};
 
+pub mod arch;
 pub mod logging;
 pub mod platform;
 pub mod spinlock;
