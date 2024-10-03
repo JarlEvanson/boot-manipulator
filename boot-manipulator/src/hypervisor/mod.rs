@@ -5,7 +5,10 @@ use core::{
     sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
 
-use crate::platform::{Platform, PlatformOps};
+use crate::{
+    arch::{Architecture, ArchitectureOps, VirtualizationOps},
+    platform::{Platform, PlatformOps},
+};
 
 /// The hypervisor is unitialized.
 const HYPERVISOR_STATE_UNINITIALIZED: u8 = 0;
@@ -76,4 +79,7 @@ impl error::Error for HypervisorInitializationError {}
 fn initialize_processor(_: *mut core::ffi::c_void) {
     let processor_id = Platform::processor_identity();
     let is_bootstrap = processor_id == BOOTSTRAP_PROCESSOR.load(Ordering::Relaxed);
+
+    assert!(<Architecture as ArchitectureOps>::Virtualization::is_supported());
+    <Architecture as ArchitectureOps>::Virtualization::initialize_processor().unwrap();
 }

@@ -1,5 +1,7 @@
 //! Abstracts platform specific code.
 
+use core::error;
+
 #[cfg(target_arch = "x86")]
 mod x86;
 
@@ -29,8 +31,18 @@ pub trait ArchitectureOps {
 
 /// Describes the basic set of virtualization APIs required for setting up `boot-manipulator`.
 pub trait VirtualizationOps {
+    /// Various errors that can occur during the initialization of a processor.
+    type InitializeProcessorError: error::Error;
+
     /// Returns `true` if virtualization is supported on this processor; otherwise returns `false`.
     fn is_supported() -> bool;
+
+    /// Initializes the virtualization technology on the calling processor.
+    ///
+    /// # Errors
+    ///
+    /// This function may return any errors that occur during the execution of this function.
+    fn initialize_processor() -> Result<(), Self::InitializeProcessorError>;
 }
 
 /// Dummy architecture to allow for easier development.
@@ -44,7 +56,13 @@ impl ArchitectureOps for DummyArch {
 pub struct DummyVirtualization;
 
 impl VirtualizationOps for DummyVirtualization {
+    type InitializeProcessorError = core::fmt::Error;
+
     fn is_supported() -> bool {
+        unimplemented!()
+    }
+
+    fn initialize_processor() -> Result<(), Self::InitializeProcessorError> {
         unimplemented!()
     }
 }
