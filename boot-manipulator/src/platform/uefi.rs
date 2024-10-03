@@ -168,6 +168,32 @@ impl PlatformOps for Uefi {
 
         uefi::boot::close_event(event).unwrap();
     }
+
+    fn allocate_frames(frame_count: usize) -> Result<u64, crate::platform::OutOfMemoryError> {
+        uefi::boot::allocate_pages(
+            uefi::boot::AllocateType::AnyPages,
+            uefi::boot::MemoryType::RUNTIME_SERVICES_DATA,
+            frame_count,
+        )
+        .map(|ptr| ptr.as_ptr() as u64)
+        .map_err(|_| crate::platform::OutOfMemoryError)
+    }
+
+    fn map_frames(
+        frame_base: u64,
+        frame_count: usize,
+    ) -> Result<*mut u8, crate::platform::MapFailure> {
+        // For now, just check that the top of the frame range is in the address space.
+        if !frame_count
+            .checked_mul(uefi::boot::PAGE_SIZE)
+            .and_then(|size| frame_base.checked_add(size as u64))
+            .is_some_and(|top| top < usize::MAX as u64)
+        {
+            return Err(crate::platform::MapFailure::VirtualMemoryFailure);
+        }
+
+        Ok(frame_base as *mut u8)
+    }
 }
 
 /// Zero sized struct to represent logging to UEFI stdout.
