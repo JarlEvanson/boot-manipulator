@@ -27,6 +27,9 @@ pub trait PlatformOps {
     /// Returns [`Self::LoggingInitializationError`] if platform logger initialization fails.
     fn initialize_logger() -> Result<&'static dyn log::Log, Self::LoggingInitializationError>;
 
+    /// Returns information about the loaded image of `boot-manipulator`.
+    fn image_info() -> ImageInfo;
+
     /// Returns the identity of the calling processor.
     ///
     /// This number is in the range from 0 to [`PlatformOps::get_processor_count()`] - 1.
@@ -108,6 +111,17 @@ impl fmt::Display for MapFailure {
 
 impl error::Error for MapFailure {}
 
+/// Information related to the layout of the loaded image of `boot-manipulator`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ImageInfo {
+    /// The number of page frames the loaded image of `boot-manipulator` occupies.
+    pub page_frame_count: usize,
+    /// The physical base address of the loaded image of `boot-manipulator`.
+    pub physical_base_address: u64,
+    /// The virtual base address of the loaded image of `boot-manipulator`.
+    pub virtual_base_address: usize,
+}
+
 /// Dummy platform to allow for development.
 pub struct DummyPlatform;
 
@@ -115,6 +129,10 @@ impl PlatformOps for DummyPlatform {
     type LoggingInitializationError = core::fmt::Error;
 
     fn initialize_logger() -> Result<&'static dyn log::Log, Self::LoggingInitializationError> {
+        unimplemented!()
+    }
+
+    fn image_info() -> ImageInfo {
         unimplemented!()
     }
 

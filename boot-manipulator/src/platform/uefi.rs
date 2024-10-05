@@ -4,7 +4,12 @@ use core::{error, fmt};
 
 use uefi::{boot::ScopedProtocol, proto::pi::mp::MpServices, Status};
 
-use crate::{logging, platform::PlatformOps, spinlock::Spinlock, DEFAULT_LOG_LEVEL};
+use crate::{
+    logging,
+    platform::{ImageInfo, PlatformOps},
+    spinlock::Spinlock,
+    DEFAULT_LOG_LEVEL,
+};
 
 /// Globally available service to query processor information and control processors.
 static mut MP_SERVICES: Option<ScopedProtocol<MpServices>> = None;
@@ -67,6 +72,29 @@ impl PlatformOps for Uefi {
 
     fn initialize_logger() -> Result<&'static dyn log::Log, Self::LoggingInitializationError> {
         Ok(&StdoutLogger)
+    }
+
+    fn image_info() -> ImageInfo {
+        let protocol =
+            uefi::boot::open_protocol_exclusive::<uefi::proto::loaded_image::LoadedImage>(
+                uefi::boot::image_handle(),
+            )
+            .unwrap();
+
+        let (base_address, size) = protocol.info();
+        let aligned_base_address = (base_address as usize) & !(uefi::boot::PAGE_SIZE - 1);
+        let page_frame_count = ((base_address as usize)
+            .checked_add(size as usize)
+            .and_then(|top_address| top_address.checked_next_multiple_of(uefi::boot::PAGE_SIZE))
+            .unwrap()
+            - aligned_base_address)
+            / uefi::boot::PAGE_SIZE;
+
+        ImageInfo {
+            page_frame_count,
+            physical_base_address: aligned_base_address as u64,
+            virtual_base_address: aligned_base_address,
+        }
     }
 
     fn processor_identity() -> usize {
