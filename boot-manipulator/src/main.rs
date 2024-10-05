@@ -5,6 +5,7 @@
 #![no_main]
 
 pub mod boot;
+pub mod spinlock;
 
 /// Handles panics that occur.
 ///
