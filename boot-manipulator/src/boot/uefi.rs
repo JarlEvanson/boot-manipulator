@@ -48,6 +48,14 @@ fn entry() -> Status {
     // Currently, initialized with `None` and this is the only processor running.
     unsafe { *mp_services_ptr = mp_services }
 
+    match crate::main() {
+        Ok(()) => {}
+        Err(error) => {
+            log::error!("{error}");
+            return Status::LOAD_ERROR;
+        }
+    }
+
     Status::SUCCESS
 }
 
