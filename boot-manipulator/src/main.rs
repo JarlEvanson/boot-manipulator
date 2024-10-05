@@ -12,6 +12,7 @@ pub mod arch;
 pub mod hypervisor;
 pub mod logging;
 pub mod platform;
+pub mod polyfill;
 pub mod spinlock;
 
 /// The default logging level.
