@@ -1,5 +1,7 @@
 //! Abstracts platform specific code.
 
+use core::marker::PhantomData;
+
 #[cfg(target_arch = "x86")]
 mod x86;
 
@@ -29,7 +31,11 @@ pub trait ArchitectureOps {
 
 /// Describes the basic set of virtualization APIs required for setting up `boot-manipulator`'s
 /// hypervisor.
-pub trait VirtualizationOps {}
+pub trait VirtualizationOps {
+    /// Returns [`VirtualizationSupported`] if virtualization is supported on the calling
+    /// processor.
+    fn is_supported() -> Option<VirtualizationSupported>;
+}
 
 /// Dummy architecture to allow for easier development.
 pub struct DummyArch;
@@ -38,7 +44,25 @@ impl ArchitectureOps for DummyArch {
     type Virtualization = DummyVirtualization;
 }
 
+/// Marker type indicating that the processor supports virtualization.
+pub struct VirtualizationSupported(PhantomData<*mut ()>);
+
+impl VirtualizationSupported {
+    /// Returns a new [`VirtualizationSupported`].
+    ///
+    /// # Safety
+    ///
+    /// This function must not be called on a processor that does not support virtualization.
+    pub const unsafe fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
 /// Dummy virtualization implementation to allow for easier development.
 pub struct DummyVirtualization;
 
-impl VirtualizationOps for DummyVirtualization {}
+impl VirtualizationOps for DummyVirtualization {
+    fn is_supported() -> Option<VirtualizationSupported> {
+        unimplemented!()
+    }
+}
