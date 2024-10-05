@@ -9,4 +9,16 @@ pub struct X86;
 
 impl ArchitectureOps for X86 {
     type Virtualization = virtualization::Multiplexer;
+
+    fn disable_interrupts() {
+        // SAFETY:
+        // `cli` is safe to execute.
+        unsafe { core::arch::asm!("cli", options(nomem, preserves_flags)) }
+    }
+
+    fn enable_interrupts() {
+        // SAFETY:
+        // `sti` is safe to execute.
+        unsafe { core::arch::asm!("sti", options(nomem, preserves_flags)) }
+    }
 }

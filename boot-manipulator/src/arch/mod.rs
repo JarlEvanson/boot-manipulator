@@ -27,6 +27,12 @@ pub type Architecture = DummyArch;
 pub trait ArchitectureOps {
     /// Architectural virtualization APIs.
     type Virtualization: VirtualizationOps;
+
+    /// Disables interrupts.
+    fn disable_interrupts();
+
+    /// Enables interrupts.
+    fn enable_interrupts();
 }
 
 /// Describes the basic set of virtualization APIs required for setting up `boot-manipulator`.
@@ -50,6 +56,14 @@ pub struct DummyArch;
 
 impl ArchitectureOps for DummyArch {
     type Virtualization = DummyVirtualization;
+
+    fn disable_interrupts() {
+        unimplemented!()
+    }
+
+    fn enable_interrupts() {
+        unimplemented!()
+    }
 }
 
 /// Dummy virtualization implementation to allow for easier development.
