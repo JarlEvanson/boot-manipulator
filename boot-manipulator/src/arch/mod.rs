@@ -1,6 +1,6 @@
 //! Abstracts platform specific code.
 
-use core::marker::PhantomData;
+use core::{error, marker::PhantomData};
 
 #[cfg(target_arch = "x86")]
 mod x86;
@@ -32,9 +32,24 @@ pub trait ArchitectureOps {
 /// Describes the basic set of virtualization APIs required for setting up `boot-manipulator`'s
 /// hypervisor.
 pub trait VirtualizationOps {
+    /// Various errors that can occur during the initialization of a processor.
+    type InitializeProcessorError: error::Error;
+
+    /// Processor specific state associated with virtualization.
+    type ProcessorState;
+
     /// Returns [`VirtualizationSupported`] if virtualization is supported on the calling
     /// processor.
     fn is_supported() -> Option<VirtualizationSupported>;
+
+    /// Initializes the virtualization technology on the calling processor.
+    ///
+    /// # Errors
+    ///
+    /// This function may return any errors that occur during the execution of this function.
+    fn initialize_processor(
+        supported: VirtualizationSupported,
+    ) -> Result<Self::ProcessorState, Self::InitializeProcessorError>;
 }
 
 /// Dummy architecture to allow for easier development.
@@ -62,7 +77,17 @@ impl VirtualizationSupported {
 pub struct DummyVirtualization;
 
 impl VirtualizationOps for DummyVirtualization {
+    type InitializeProcessorError = core::fmt::Error;
+
+    type ProcessorState = ();
+
     fn is_supported() -> Option<VirtualizationSupported> {
+        unimplemented!()
+    }
+
+    fn initialize_processor(
+        _: VirtualizationSupported,
+    ) -> Result<(), Self::InitializeProcessorError> {
         unimplemented!()
     }
 }

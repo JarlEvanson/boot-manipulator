@@ -15,11 +15,21 @@ impl ArchitectureOps for X86 {
 pub struct Virtualization;
 
 impl VirtualizationOps for Virtualization {
+    type InitializeProcessorError = virtualization::InitializeProcessorError;
+
+    type ProcessorState = virtualization::ProcessorState;
+
     fn is_supported() -> Option<VirtualizationSupported> {
         virtualization::supported_technology().map(|_| {
             // SAFETY:
             // Virtualization is supported on this processor.
             unsafe { VirtualizationSupported::new() }
         })
+    }
+
+    fn initialize_processor(
+        _: VirtualizationSupported,
+    ) -> Result<Self::ProcessorState, Self::InitializeProcessorError> {
+        virtualization::initialize_processor()
     }
 }
