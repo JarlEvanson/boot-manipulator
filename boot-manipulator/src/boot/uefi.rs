@@ -1,6 +1,6 @@
 //! UEFI specific code.
 
-use core::{error, fmt};
+use core::{error, fmt, ptr::NonNull};
 
 use uefi::{boot::ScopedProtocol, proto::pi::mp::MpServices, Status};
 
@@ -64,6 +64,8 @@ pub struct Uefi;
 
 impl BootOps for Uefi {
     type LoggingInitializationError = LoggingInitializationError;
+
+    const FRAME_SIZE: usize = uefi::boot::PAGE_SIZE;
 
     fn initialize_logger() -> Result<&'static dyn log::Log, Self::LoggingInitializationError> {
         Ok(&StdoutLogger)
@@ -167,6 +169,48 @@ impl BootOps for Uefi {
         }
 
         uefi::boot::close_event(event).unwrap();
+    }
+
+    fn allocate_frames(frame_count: usize) -> Result<u64, crate::boot::OutOfMemoryError> {
+        uefi::boot::allocate_pages(
+            uefi::boot::AllocateType::AnyPages,
+            uefi::boot::MemoryType::RUNTIME_SERVICES_DATA,
+            frame_count,
+        )
+        .map(|ptr| ptr.as_ptr() as u64)
+        .map_err(|_| crate::boot::OutOfMemoryError)
+    }
+
+    fn map_frames(
+        frame_base: u64,
+        frame_count: usize,
+    ) -> Result<NonNull<u8>, crate::boot::MapFailure> {
+        // For now, just check that the top of the frame range is in the address space.
+        if !frame_count
+            .checked_mul(uefi::boot::PAGE_SIZE)
+            .and_then(|size| frame_base.checked_add(size as u64))
+            .is_some_and(|top| top < usize::MAX as u64)
+            || frame_base == 0
+        {
+            return Err(crate::boot::MapFailure::VirtualMemoryFailure);
+        }
+
+        Ok(NonNull::new(frame_base as *mut u8).unwrap())
+    }
+
+    unsafe fn unmap_frames(_: u64, _: usize) {}
+
+    unsafe fn deallocate_frames(frame_base: u64, frame_count: usize) {
+        // SAFETY:
+        // According to the invariants of this function, no references into the allocation remain,
+        // and the memory at the allocation is not used after this.
+        unsafe {
+            uefi::boot::free_pages(
+                core::ptr::NonNull::new(frame_base as *mut u8).unwrap(),
+                frame_count,
+            )
+            .unwrap()
+        }
     }
 }
 
